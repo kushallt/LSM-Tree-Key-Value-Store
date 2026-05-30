@@ -1,0 +1,12 @@
+
+write throughput(in writes/sec) 1317.89 - for 500 writes;
+write throughput(in writes/sec) 384.866 - for 5000 writes;
+write throughput(in writes/sec) 351.991 - for 10000 writes;
+
+reading 10000 existing keys:
+read throughput(in reads/sec) 20209.7 - with bloom filters;
+read throughput(in reads/sec) 20373 - without bloom filters;
+
+reading 5000 existing keys and 5000 non existing keys:
+read throughput(in reads/sec) 22596.3 - without bloom filters;
+read throughput(in reads/sec) 32977.5 - with bloom filters;
