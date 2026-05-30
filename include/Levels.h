@@ -2,7 +2,6 @@
 
 #include "SSTable.h"
 #include "filecounter.h"
-#include "fastvectorremoval.h"
 #include <queue>
 #include <fstream>
 

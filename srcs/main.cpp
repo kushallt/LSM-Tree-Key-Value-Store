@@ -34,7 +34,6 @@ void run()
     Levels levels;
     levels.initialize();
     std::string key, value;
-
     std::ofstream benchmarkfile("benchmark_results.csv", std::ios::app);
 
     int ind = 0;
