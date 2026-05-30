@@ -1,16 +1,17 @@
 CXX      = g++
-CXXFLAGS = -std=c++17 -Wall -Wextra -g
+CXXFLAGS = -std=c++17 -Wall -Wextra -g -Iinclude
 
 TARGET  = main.exe
-SRCS    = $(wildcard *.cpp)
-OBJS    = $(SRCS:.cpp=.o)
+SRCS    = $(wildcard srcs/*.cpp)
+OBJS    = $(patsubst srcs/%.cpp, obj/%.o, $(SRCS))
+HEADERS = $(wildcard include/*.h)
 
 all: $(TARGET)
 
 $(TARGET): $(OBJS)
 	$(CXX) $(CXXFLAGS) -o $@ $^
 
-%.o: %.cpp memtable.h
+obj/%.o: srcs/%.cpp $(HEADERS)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 clean:
