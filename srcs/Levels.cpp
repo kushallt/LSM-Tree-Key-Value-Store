@@ -22,7 +22,7 @@ void Levels::compact(int l1)
         if (s && rangesOverlap(s->startkey, s->endkey))
         {
             SSTtoPq(s, entrypq, l1 + 1);
-            sizeofLevels[l1 + 1] -= s->getfilesize();
+            sizeofLevels[l1 + 1] -= s->filesize;
             if (std::filesystem::exists(s->filename))
             {
                 std::filesystem::remove(s->filename);
@@ -41,7 +41,7 @@ void Levels::compact(int l1)
         if (s && rangesOverlap(s->startkey, s->endkey))
         {
             SSTtoPq(s, entrypq, l1);
-            sizeofLevels[l1] -= s->getfilesize();
+            sizeofLevels[l1] -= s->filesize;
             if (std::filesystem::exists(s->filename))
             {
                 std::filesystem::remove(s->filename);
@@ -90,7 +90,7 @@ void Levels::compact(int l1)
 
         newsst->writeSST(tempmemtable);
         levelsInfo[l1 + 1].push_back(newsst);
-        sizeofLevels[l1 + 1] += newsst->getfilesize();
+        sizeofLevels[l1 + 1] += newsst->filesize;
         std::sort(levelsInfo[l1 + 1].begin(), levelsInfo[l1 + 1].end(), [](const std::shared_ptr<SSTable> a, const std::shared_ptr<SSTable> b)
                   {
                     if (!a) return false;
@@ -173,7 +173,7 @@ bool Levels::initialize()
 void Levels::addSST(std::shared_ptr<SSTable> s)
 {
     levelsInfo[0].push_back(s);
-    sizeofLevels[0] += s->getfilesize();
+    sizeofLevels[0] += s->filesize;
     if (sizeofLevels[0] > maxSize[0])
     {
         // std::cout << "yes" << std::endl;

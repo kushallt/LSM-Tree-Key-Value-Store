@@ -4,6 +4,8 @@
 #include <iostream>
 #include <chrono>
 #include <iomanip>
+#include <thread>
+#include "flushWorker.h"
 
 void log_performance(double num, std::ofstream &file, std::string text)
 {
@@ -15,22 +17,11 @@ void log_performance(double num, std::ofstream &file, std::string text)
     }
 }
 
-void writeToDisk(std::unique_ptr<MemTable> &memtable, Levels &levels)
-{
-    auto sst = std::make_shared<SSTable>();
-    std::string filename = filecounter.setfilename("sstable");
-    uint64_t filecount = filecounter.setcount();
-    sst->filecount = filecount;
-    sst->filename = filename;
-    sst->writeSST(*memtable);
-    levels.addSST(sst);
-    memtable = std::make_unique<MemTable>();
-}
 
 void run()
 {
 
-    std::unique_ptr<MemTable> memtable = std::make_unique<MemTable>();
+    std::shared_ptr<MemTable> memtable = std::make_shared<MemTable>();
     Levels levels;
     levels.initialize();
     std::string key, value;
@@ -39,43 +30,60 @@ void run()
     int ind = 0;
     std::string val = "kushal";
     std::string keytest;
-    auto writestart = std::chrono::high_resolution_clock::now(); 
+    auto writestart = std::chrono::high_resolution_clock::now();
     int numWriteOperations = 10000;
+
+    std::thread workerThread(flushWorker, std::ref(levels));
+
     while (ind < numWriteOperations)
     {
+        std::clog<<"\rind"<<ind<<std::flush;
         std::ostringstream oss;
-        oss << std::setw(6) << std::setfill('0') << ind*2;
+        oss << std::setw(6) << std::setfill('0') << ind;
         keytest = oss.str();
         memtable->insertElement(keytest, val);
         if (memtable->size >= memtable->maxsize)
         {
-            writeToDisk(memtable, levels);
+            {
+                std::lock_guard<std::mutex> lock(queueMutex);
+                flushQueue.push(memtable);
+                memtable = std::make_shared<MemTable>();
+            }
+            cv.notify_one();
         }
 
         // std::cout<<"added element :"<<ind<<std::endl;
         ind++;
     }
-    if (memtable->nkeys > 0)
+    std::cout<<"partial writing done."<<std::endl;
     {
-        writeToDisk(memtable, levels);
+        std::lock_guard<std::mutex> lock(queueMutex);
+        flushQueue.push(memtable);
+        shutdown = true;
     }
+    cv.notify_one();
+    workerThread.join();
+    std::cout<<"writing completely to disk done"<<std::endl;
+
     auto writeend = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> duration = writeend - writestart;
-    double throughput = numWriteOperations / duration.count() ;
+    double throughput = numWriteOperations / duration.count();
     // log_performance(throughput, benchmarkfile, "write throughput(in writes/sec) ");
 
     int numreads = 10000;
     auto readstart = std::chrono::high_resolution_clock::now();
-    for(int i=0; i<numreads; i++){
+    for (int i = 0; i < numreads; i++)
+    {
         std::ostringstream oss;
         oss << std::setw(6) << std::setfill('0') << i;
         keytest = oss.str();
         levels.searchLevels(keytest);
     }
-    auto readend = std::chrono::high_resolution_clock::now();;
-    duration = readend - readstart;  
-    double readlatency = numreads/duration.count();
-    log_performance(readlatency, benchmarkfile, "read latency(in reads/sec) ");
+    auto readend = std::chrono::high_resolution_clock::now();
+    ;
+    duration = readend - readstart;
+    double readlatency = numreads / duration.count();
+    // log_performance(readlatency, benchmarkfile, "read latency(in reads/sec) ");
 
     int lv = 0;
     for (auto &v : levels.levelsInfo)

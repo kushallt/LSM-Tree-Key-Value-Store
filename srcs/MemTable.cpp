@@ -32,11 +32,11 @@ MemTable::MemTable()
     size += sizeof(Entry);
     level = 0;
     p = 0.5f;
-    if (!isFileEmpty(wal))
-    {
-        WALtoMem();
-    }
     WALinitialize();
+    // if (!isFileEmpty(wal))
+    // {
+    //     WALtoMem();
+    // }
 }
 
 MemTable::~MemTable()

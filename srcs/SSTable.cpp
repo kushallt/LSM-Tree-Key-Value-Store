@@ -1,5 +1,6 @@
 #include "SSTable.h"
-SSTable::~SSTable(){
+SSTable::~SSTable()
+{
     // if(std::filesystem::exists(filename)){
     //     std::filesystem::remove(filename);
     // }
@@ -23,10 +24,9 @@ void SSTable::writeSST(MemTable &memtable)
     std::string key, value;
     uint8_t keylength, vallength;
     uint64_t offset;
-    uint64_t prevoffset = -1-blocksize;
+    uint64_t prevoffset = -1 - blocksize;
 
     int setstart = 0;
-    uint64_t prevfilesize = getfilesize();
 
     while (n != nullptr)
     {
@@ -35,7 +35,8 @@ void SSTable::writeSST(MemTable &memtable)
         uint8_t tombstone = n->entry->tombStone;
         endkey = key;
 
-        if(!setstart){
+        if (!setstart)
+        {
             startkey = key;
             setstart = 1;
         }
@@ -45,13 +46,11 @@ void SSTable::writeSST(MemTable &memtable)
 
         computeBloomFingerprint(bloomBuckets, key);
 
-        uint64_t currfilesize = getfilesize();
         offset = outfile.tellp();
         if (offset - prevoffset > blocksize)
         {
             prevoffset = offset;
             tempIndexList.emplace_back(offset, key);
-            prevfilesize = currfilesize;
         }
         outfile.write((char *)&keylength, sizeof(uint8_t));
         outfile.write(key.data(), key.size());
@@ -60,7 +59,6 @@ void SSTable::writeSST(MemTable &memtable)
         outfile.write(value.data(), value.size());
 
         outfile.write((char *)&tombstone, sizeof(uint8_t));
-
 
         n = n->next[0];
     }
@@ -84,10 +82,15 @@ void SSTable::writeSST(MemTable &memtable)
     stored = 1;
     outfile.close();
     // std::cout << "done writing to sst." << std::endl;
-    memtable.walstream.close();
-    if(std::filesystem::exists(memtable.wal)){
+    if (memtable.walstream.is_open())
+    {
+        memtable.walstream.close();
+    }
+    if (std::filesystem::exists(memtable.wal))
+    {
         std::filesystem::remove(memtable.wal);
     }
+    filesize = footerOffset + sizeof(uint64_t) * 2;
 }
 
 void SSTable::computeBloomFingerprint(std::vector<uint8_t> &buckets, std::string key)
@@ -97,7 +100,7 @@ void SSTable::computeBloomFingerprint(std::vector<uint8_t> &buckets, std::string
     uint64_t bucketssize = (uint64_t)(buckets.size() * 8);
     for (int i = 0; i < numhashes; i++)
     {
-        
+
         uint64_t bucket_index = (h1 + i * h2) % bucketssize;
 
         size_t byte_idx = bucket_index / 8; // Division to find the byte bucket
@@ -124,7 +127,7 @@ bool SSTable::bloomFilter(const std::string &key, const std::vector<uint8_t> &bu
             return 0;
         }
     }
-    
+
     return 1;
 }
 
@@ -141,14 +144,15 @@ uint64_t SSTable::fnv1a(const std::string &key, uint64_t seed)
 
 std::string SSTable::searchKey(std::string key)
 {
-    if(!bloomFilter(key, bloomBuckets)) return "";
+    if (!bloomFilter(key, bloomBuckets))
+        return "";
     std::ifstream infile(filename, std::ios::binary);
 
     uint64_t sparseIndexOffset = 0;
     uint64_t bloomOffset = 0;
     infile.seekg(footerOffset, std::ios::beg);
 
-    infile.read((char *)(&bloomOffset), sizeof(bloomOffset));    
+    infile.read((char *)(&bloomOffset), sizeof(bloomOffset));
     infile.read((char *)&sparseIndexOffset, sizeof(sparseIndexOffset));
 
     uint8_t strlength;
@@ -159,27 +163,37 @@ std::string SSTable::searchKey(std::string key)
 
     infile.seekg(sparseIndexOffset, std::ios::beg);
 
-    while(infile && (uint64_t)infile.tellg() < footerOffset){
-        if(!infile.read((char*)&strlength, sizeof(strlength))) break;
+    while (infile && (uint64_t)infile.tellg() < footerOffset)
+    {
+        if (!infile.read((char *)&strlength, sizeof(strlength)))
+            break;
         std::string searchkey(strlength, '\0');
-        if(!infile.read(searchkey.data(), (size_t)strlength)) break;
-        if(!infile.read((char *)&offset, sizeof(offset))) break;
-        if(searchkey <= key){
+        if (!infile.read(searchkey.data(), (size_t)strlength))
+            break;
+        if (!infile.read((char *)&offset, sizeof(offset)))
+            break;
+        if (searchkey <= key)
+        {
             trueoffset = offset;
             currentkey = searchkey;
             flag = 1;
         }
-        else break;
+        else
+            break;
     }
-    if(!flag) return "";
+    if (!flag)
+        return "";
     infile.seekg(trueoffset, std::ios::beg);
-    
-    while(infile && (uint64_t)infile.tellg() < bloomOffset){
+
+    while (infile && (uint64_t)infile.tellg() < bloomOffset)
+    {
         uint8_t keylength, vallength;
 
-        if(!infile.read((char*)&keylength, sizeof(uint8_t))) break;
+        if (!infile.read((char *)&keylength, sizeof(uint8_t)))
+            break;
         std::string currkey(keylength, '\0');
-        if(!infile.read(currkey.data(), (size_t)keylength)) break;
+        if (!infile.read(currkey.data(), (size_t)keylength))
+            break;
 
         infile.read((char *)&vallength, sizeof(uint8_t));
         std::string currval(vallength, '\0');
@@ -188,22 +202,34 @@ std::string SSTable::searchKey(std::string key)
         uint8_t tombstone;
         infile.read((char *)&tombstone, sizeof(tombstone));
 
-        if(currkey == key){
-           if(tombstone) return "[DELETED KEY]";
-           else return currval;
+        if (currkey == key)
+        {
+            if (tombstone)
+                return "[DELETED KEY]";
+            else
+                return currval;
         }
-        if(currkey > key) break;
+        if (currkey > key)
+            break;
     }
     return "";
-
 }
-void SSTable::writeBuckets(std::vector<uint8_t>& buckets){
-    for(const auto& b:buckets){
-        std::cout<<static_cast<int>(b)<<" ";
+void SSTable::writeBuckets(std::vector<uint8_t> &buckets)
+{
+    for (const auto &b : buckets)
+    {
+        std::cout << static_cast<int>(b) << " ";
     }
-    std::cout<<std::endl;
+    std::cout << std::endl;
 }
 
-uint64_t SSTable::getfilesize(){
-    return (uint64_t)std::filesystem::file_size(filename);
+uint64_t SSTable::getfilesize()
+{
+    if (!std::filesystem::exists(filename))
+    {
+        std::cerr << "\nMISSING FILE: " << filename << '\n';
+        std::abort();
+    }
+
+    return filesize;
 }

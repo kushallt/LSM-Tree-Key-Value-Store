@@ -12,6 +12,7 @@ public:
     std::string endkey;
     std::string filename;
     uint64_t filecount;
+    uint64_t filesize = 0;
     uint64_t blocksize = 20;
     int numhashes;
     uint64_t footerOffset;
